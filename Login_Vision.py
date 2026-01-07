@@ -1,4 +1,3 @@
-#--------------------------------------Importamos librerias--------------------------------------------
 from tkinter import *
 from tkinter import messagebox
 import os
@@ -17,12 +16,15 @@ class SistemaAsistencia:
     def __init__(self):
         self.pantalla = Tk()
         self.pantalla.title("Sistema de Control de Asistencia")
+        
         # 🔹 Tamaño de la ventana
         ancho = 400
         alto = 400
+        
         # 🔹 Tamaño de la pantalla
         pantalla_ancho = self.pantalla.winfo_screenwidth()
         pantalla_alto = self.pantalla.winfo_screenheight()
+        
         # 🔹 Posición centrada
         x = (pantalla_ancho // 2) - (ancho // 2)
         y = (pantalla_alto // 2) - (alto // 2)
@@ -63,15 +65,16 @@ class SistemaAsistencia:
         
         Label(self.pantalla, text="").pack(pady=10)
         
-        # Botón Marcar Asistencia (principal)
-        Button(self.pantalla, text="📋 MARCAR ASISTENCIA", height="2", width="35",
-               bg="#4CAF50", fg="white", font=("Arial", 12, "bold"),
-               command=self.ventana_marcar_asistencia).pack(pady=10)
-        
         # Botón Registro
         Button(self.pantalla, text="👤 Registro de Usuario", height="2", width="35",
                bg="#2196F3", fg="white", font=("Arial", 11, "bold"),
                command=self.ventana_registro).pack(pady=10)
+        
+        
+        # Botón Marcar Asistencia (principal)
+        Button(self.pantalla, text="📋 MARCAR ASISTENCIA", height="2", width="35",
+               bg="#4CAF50", fg="white", font=("Arial", 11, "bold"),
+               command=self.ventana_marcar_asistencia).pack(pady=10)
         
         # Botón Salir
         Button(self.pantalla, text="❌ Salir", height="2", width="35",
@@ -87,6 +90,7 @@ class SistemaAsistencia:
         # 🔹 Tamaño de la pantalla
         pantalla_ancho = self.pantalla_registro.winfo_screenwidth()
         pantalla_alto = self.pantalla_registro.winfo_screenheight()
+        
         # 🔹 Posición centrada
         x = (pantalla_ancho // 2) - (ancho // 2)
         y = (pantalla_alto // 2) - (alto // 2)
@@ -111,7 +115,7 @@ class SistemaAsistencia:
             font=("Arial", 11, "bold")
         ).pack()
 
-        self.usuario_registro = StringVar()
+        self.usuario_registro = StringVar()    # Variable para almacenar el nombre de usuario
         entry_usuario = Entry(
             self.pantalla_registro,
             textvariable=self.usuario_registro,
@@ -133,7 +137,7 @@ class SistemaAsistencia:
             fg="white",
             font=("Arial", 11, "bold"),
             command=self.preparar_captura_registro
-        ).pack(pady=15)
+        ).pack(pady=10)
 
         self.label_resultado_reg = Label(
             self.pantalla_registro,
@@ -220,7 +224,7 @@ class SistemaAsistencia:
             fg="#E65100"
         ).pack(pady=10)
 
-        Label(frame_instrucciones, text="✓ Centra tu rostro en la cámara",
+        Label(frame_instrucciones, text="✓ Centra tu rostro, se realizara 3 capturas",
             font=("Arial", 10), bg="#FFF3E0", anchor="w").pack(padx=20, pady=3)
 
         Label(frame_instrucciones, text="✓ Asegúrate de tener buena iluminación",
@@ -280,7 +284,7 @@ class SistemaAsistencia:
             # 2️⃣ CREAR VENTANA DE VISTA PREVIA
             # ═══════════════════════════════════════════════════════════════
             cv2.namedWindow('Captura de Rostro - Registro', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('Captura de Rostro - Registro', 640, 480)
+            cv2.resizeWindow('Captura de Rostro - Registro', 640, 540)   #640*480
 
             # ═══════════════════════════════════════════════════════════════
             # 3️⃣ BUCLE PRINCIPAL - SOLO VISTA PREVIA
@@ -290,12 +294,12 @@ class SistemaAsistencia:
                 if not ret:
                     break
 
-                frame_preview = cv2.resize(frame, (640, 480))
+                frame_preview = cv2.resize(frame, (640, 540)) #640*480
                 
                 # ───────────────────────────────────────────────────────────
                 # 4️⃣ DIBUJAR ÓVALO GUÍA (ESTÁTICO)
                 # ───────────────────────────────────────────────────────────
-                center_x, center_y = 320, 240
+                center_x, center_y = 320, 270  #320*240
                 axis_x, axis_y = 140, 180
                 
                 # Óvalo verde guía
@@ -316,18 +320,14 @@ class SistemaAsistencia:
                 cv2.putText(frame_preview, f"Usuario: {usuario}", 
                         (220, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
                 
-                # Mensaje central
-                cv2.putText(frame_preview, "Centra tu rostro en el ovalo verde", 
-                        (130, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                
                 # Fondo inferior
                 overlay = frame_preview.copy()
-                cv2.rectangle(overlay, (0, 440), (640, 480), (0, 0, 0), -1)
+                cv2.rectangle(overlay, (0, 500), (640, 540), (0, 0, 0), -1)
                 cv2.addWeighted(overlay, 0.6, frame_preview, 0.4, 0, frame_preview)
                 
                 # Instrucciones
                 cv2.putText(frame_preview, "ESPACIO: Capturar  |  ESC: Cancelar", 
-                        (140, 465), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                        (140, 530), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
                 cv2.imshow('Captura de Rostro - Registro', frame_preview)
 
@@ -505,6 +505,8 @@ class SistemaAsistencia:
 
         except Exception as e:
             messagebox.showerror("Error", f"Error en el registro:\n{str(e)}")
+   
+   
     def ventana_marcar_asistencia(self):
         self.pantalla_asistencia = Toplevel(self.pantalla)
         self.pantalla_asistencia.title("Marcar Asistencia")
@@ -581,7 +583,7 @@ class SistemaAsistencia:
             # 2️⃣ CREAR VENTANA DE VISTA PREVIA
             # ═══════════════════════════════════════════════════════════════
             cv2.namedWindow('Marcar Asistencia', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('Marcar Asistencia', 640, 480)
+            cv2.resizeWindow('Marcar Asistencia', 640, 540)
 
             # ═══════════════════════════════════════════════════════════════
             # 3️⃣ BUCLE PRINCIPAL - SOLO VISTA PREVIA
@@ -591,12 +593,12 @@ class SistemaAsistencia:
                 if not ret:
                     break
 
-                frame_preview = cv2.resize(frame, (640, 480))
+                frame_preview = cv2.resize(frame, (640, 540))
                 
                 # ───────────────────────────────────────────────────────────
                 # 4️⃣ DIBUJAR ÓVALO GUÍA (IGUAL QUE REGISTRO)
                 # ───────────────────────────────────────────────────────────
-                center_x, center_y = 320, 240
+                center_x, center_y = 320, 270
                 axis_x, axis_y = 140, 180
                 
                 # Óvalo verde guía
@@ -617,18 +619,14 @@ class SistemaAsistencia:
                 cv2.putText(frame_preview, "Sistema de Reconocimiento Facial", 
                         (160, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
                 
-                # Mensaje central
-                cv2.putText(frame_preview, "Centra tu rostro en el ovalo verde", 
-                        (130, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                
                 # Fondo inferior
                 overlay = frame_preview.copy()
-                cv2.rectangle(overlay, (0, 440), (640, 480), (0, 0, 0), -1)
+                cv2.rectangle(overlay, (0, 500), (640, 540), (0, 0, 0), -1)
                 cv2.addWeighted(overlay, 0.6, frame_preview, 0.4, 0, frame_preview)
                 
                 # Instrucciones
                 cv2.putText(frame_preview, "ESPACIO: Capturar  |  ESC: Cancelar", 
-                        (140, 465), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                        (140, 530), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
                 cv2.imshow('Marcar Asistencia', frame_preview)
 
