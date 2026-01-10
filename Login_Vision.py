@@ -5,7 +5,8 @@ import cv2
 from matplotlib import pyplot as plt
 from mtcnn.mtcnn import MTCNN
 import numpy as np
-from datetime import datetime
+from datetime import datetime, time
+
 import mysql.connector
 from dotenv import load_dotenv
 from deepface import DeepFace
@@ -625,19 +626,21 @@ class SistemaAsistencia:
         
         Label(frame_instrucciones, text="").pack(pady=5)
         
-        Label(self.pantalla_asistencia, text="").pack(pady=10)
+        Label(self.pantalla_asistencia, text="").pack(pady=5)
         
-        Button(self.pantalla_asistencia, 
-               text="📷 INICIAR CAPTURA", 
-               width=30, height=2, bg="#4CAF50", fg="white",
-               font=("Arial", 12, "bold"),
-               command=lambda: self.capturar_asistencia(self.pantalla_asistencia)
-               ).pack(pady=10)
+        Label(
+            self.pantalla_asistencia,
+            text="📝 Observación (solo si llega tarde):",font=("Arial", 10, "bold"),bg="#E8F5E9",anchor="w").pack(padx=20, pady=(5, 2), fill="x")
+        self.usuario_observacion = StringVar()    # Variable para almacenar
+        entry_usuario_obs = Entry(self.pantalla_asistencia,textvariable=self.usuario_observacion,font=("Arial", 13),width=30,justify="left")
+        entry_usuario_obs.pack(pady=6)
+        entry_usuario_obs.focus()
         
-        Button(self.pantalla_asistencia, text="Cancelar", 
-               width=30, height=2, bg="#f44336", fg="white",
-               font=("Arial", 10),
-               command=self.pantalla_asistencia.destroy).pack(pady=5)
+        Label(self.pantalla_asistencia, text="").pack(pady=1)
+        
+        Button(self.pantalla_asistencia, text="📷 INICIAR CAPTURA", width=30, height=2, bg="#4CAF50", fg="white",font=("Arial", 12, "bold"),command=lambda: self.capturar_asistencia(self.pantalla_asistencia ) ).pack(pady=10)
+        
+        Button(self.pantalla_asistencia, text="Cancelar", width=30, height=2, bg="#f44336", fg="white",font=("Arial", 10), command=self.pantalla_asistencia.destroy).pack(pady=5)
 
     def capturar_asistencia(self, pantalla_asistencia):
         try:
@@ -858,7 +861,10 @@ class SistemaAsistencia:
                 os.makedirs("rostros_asistencia")
                 
             fecha_hora_actual = datetime.now()
+
+            # PARA ARCHIVOS (sin :)
             fecha_hora_str = fecha_hora_actual.strftime("%Y-%m-%d_%H-%M-%S")
+
             temp_login = f"rostros_asistencia/temp_asistencia_{fecha_hora_str}.jpg"
             cv2.imwrite(temp_login, rostro_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
@@ -915,22 +921,71 @@ class SistemaAsistencia:
                 # Convertir distancia a porcentaje de similitud para mostrar
                 similitud_porcentual = max(0, (1 - (mejor_distancia / umbral_distancia)))
                 
+                # ───────── FECHA Y HORA ─────────
+                fecha_actual = fecha_hora_actual.strftime("%Y-%m-%d")
+                hora_actual  = fecha_hora_actual.strftime("%H:%M:%S")
                 fecha_hora_formato_db = fecha_hora_actual.strftime("%Y-%m-%d %H:%M:%S")
                 nombre_imagen_asistencia = f"{usuario_encontrado}_{fecha_hora_str}.jpg"
                 ruta_imagen_final = f"rostros_asistencia/{nombre_imagen_asistencia}"
                 os.rename(temp_login, ruta_imagen_final)
-
+                
                 # ═══════════════════════════════════════════════════════════════
                 # 1️⃣6️⃣ GUARDAR EN BASE DE DATOS
                 # ═══════════════════════════════════════════════════════════════
+                # ───────── REGLAS DE ASISTENCIA ─────────
+                tipo, estado, minutos_extra = self.determinar_tipo_estado_y_minutos(fecha_hora_actual)
+                # Interpretación:
+                if tipo == 1:
+                    tipo_str = "ENTRADA"
+                elif tipo == 2:
+                    tipo_str = "SALIDA"
+                else:
+                    tipo_str = "FUERA DE HORARIO"
+
+                if estado == 1:
+                    estado_str = "NORMAL"
+                elif estado == 2:
+                    estado_str = "TARDANZA"
+                else:
+                    estado_str = "INDETERMINADO"
+                    
+                # ───────── OBSERVACION ─────────   
+                if estado == 2:  # TARDANZA
+                    # Usuario debe justificar tardanza
+                    justificacion = self.usuario_observacion.get().strip()
+                    if justificacion:
+                        observacion = f"{estado_str}--{justificacion}"
+                    else:
+                        observacion = f"{estado_str}--Sin justificación"
+                        
+                elif minutos_extra > 0:  # TIEMPO EXTRA (entrada temprana o salida tardía)
+                    if tipo == 1:  # Entrada temprana
+                        observacion = f"{tipo_str} TEMPRANA (+{minutos_extra} min extra)"
+                    else:  # Salida tardía
+                        observacion = f"{tipo_str} TARDÍA (+{minutos_extra} min extra)"
+                else:  # NORMAL
+                    observacion = tipo_str
+                    
                 conexion = self.conectar_db()
                 if conexion:
                     try:
                         cursor = conexion.cursor()
-                        query = """INSERT INTO asistencias (nombre_usuario, fecha_hora, similitud, imagen_asistencia) 
-                                VALUES (%s, %s, %s, %s)"""
-                        cursor.execute(query, (usuario_encontrado, fecha_hora_formato_db, 
-                                            f"{mejor_distancia:.4f}", nombre_imagen_asistencia))
+                        query = """
+                                INSERT INTO asistencias
+                                (nombre_usuario, fecha, hora, tipo, estado, minutos_extra, observacion, similitud, imagen_asistencia)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """
+                        cursor.execute(query, (
+                            usuario_encontrado,
+                            fecha_actual,
+                            hora_actual,
+                            tipo,
+                            estado,
+                            minutos_extra,
+                            observacion,
+                            f"{mejor_distancia:.4f}",
+                            nombre_imagen_asistencia
+                        ))
                         conexion.commit()
                         cursor.close()
                         conexion.close()
@@ -968,7 +1023,91 @@ class SistemaAsistencia:
 
         except Exception as e:
             messagebox.showerror("Error", f"Error al marcar asistencia:\n{str(e)}")
+    
+    def determinar_tipo_estado_y_minutos(self, fecha_hora_actual):
+        """
+        Determina tipo de asistencia, estado y minutos extra.
+        
+        Returns:
+            tuple: (tipo, estado, minutos_extra)
+            - tipo: 1=ENTRADA, 2=SALIDA
+            - estado: 1=NORMAL, 2=TARDANZA
+            - minutos_extra: int (positivo=extras trabajadas, negativo=llegada temprana)
+        """
+        hora = fecha_hora_actual.time()
+        minutos_actuales = fecha_hora_actual.hour * 60 + fecha_hora_actual.minute
 
+        # Entrada Mañana
+        ENTRADA_MANANA_INICIO = 8 * 60       # 08:00 = 480 min
+        ENTRADA_MANANA_FIN = 8 * 60 + 30     # 08:30 = 510 min
+        
+        # Entrada Tarde
+        ENTRADA_TARDE_INICIO = 14 * 60       # 14:00 = 840 min
+        ENTRADA_TARDE_FIN = 15 * 60 + 20     # 15:20 = 920 min
+        
+        # Salida Mediodía
+        SALIDA_MEDIODIA_INICIO = 12 * 60 + 55  # 12:55 = 775 min
+        SALIDA_MEDIODIA_FIN = 14 * 60          # 14:00 = 840 min
+        
+        # Salida Noche
+        SALIDA_NOCHE_INICIO = 17 * 60 + 55   # 17:55 = 1075 min
+        SALIDA_NOCHE_FIN = 18 * 60 + 15      # 18:15 = 1095 min
+
+        # ═══════════════════════════════════════════════════════════════
+        # 🌅 BLOQUE 1: ENTRADA MAÑANA
+        # ═══════════════════════════════════════════════════════════════
+        
+        # Caso 1: ANTES de 08:00 (Entrada temprana con tiempo extra)
+        if minutos_actuales < ENTRADA_MANANA_INICIO:
+            minutos_extra = ENTRADA_MANANA_INICIO - minutos_actuales  # Positivo
+            return 1, 1, minutos_extra
+        
+        # Caso 2: 08:00 - 08:30 (Entrada normal)
+        if ENTRADA_MANANA_INICIO <= minutos_actuales <= ENTRADA_MANANA_FIN:
+            return 1, 1, 0
+        
+        # Caso 3: 08:30 - 12:55 (Entrada tarde sin extra)
+        if ENTRADA_MANANA_FIN < minutos_actuales < SALIDA_MEDIODIA_INICIO:
+            return 1, 2, 0
+
+        # ═══════════════════════════════════════════════════════════════
+        # 🌆 BLOQUE 2: SALIDA MEDIODÍA
+        # ═══════════════════════════════════════════════════════════════
+        if SALIDA_MEDIODIA_INICIO <= minutos_actuales <= SALIDA_MEDIODIA_FIN:
+            return 2, 1, 0
+
+        # ═══════════════════════════════════════════════════════════════
+        # 🌤️ BLOQUE 3: ENTRADA TARDE
+        # ═══════════════════════════════════════════════════════════════
+        
+        # ✅ Caso: 14:00 - 15:20 (Entrada normal)
+        if ENTRADA_TARDE_INICIO <= minutos_actuales <= ENTRADA_TARDE_FIN:
+            return 1, 1, 0
+        
+        # ✅ Caso: 15:20 - 17:55 (Entrada tarde)
+        if ENTRADA_TARDE_FIN < minutos_actuales < SALIDA_NOCHE_INICIO:
+            return 1, 2, 0
+
+        # ═══════════════════════════════════════════════════════════════
+        # 🌙 BLOQUE 4: SALIDA NOCHE
+        # ═══════════════════════════════════════════════════════════════
+        
+        #  Caso: 17:55 - 18:15 (Salida normal)
+        if SALIDA_NOCHE_INICIO <= minutos_actuales <= SALIDA_NOCHE_FIN:
+            return 2, 1, 0
+        
+        # Caso: DESPUÉS de 18:15 (Salida tardía con tiempo extra)
+        if minutos_actuales > SALIDA_NOCHE_FIN:
+            minutos_extra = minutos_actuales - SALIDA_NOCHE_FIN
+            return 2, 1, minutos_extra
+
+        # ═══════════════════════════════════════════════════════════════
+        # ⚠️ BLOQUE 5: FUERA DE HORARIO 
+        # ═══════════════════════════════════════════════════════════════
+        # Esto cubre horarios extraños como 02:00 AM, 23:00 PM, etc.
+        return 0, 0, 0  # 0 = INDETERMINADO
+
+    
     def comparar_rostros(self, img1_path, img2_path):
         """
         Compara dos rostros y retorna la DISTANCIA (menor = más similar)
