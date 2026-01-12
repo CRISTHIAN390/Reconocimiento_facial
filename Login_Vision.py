@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from mtcnn.mtcnn import MTCNN
 import numpy as np
 from datetime import datetime, time
-
+from PIL import Image, ImageTk
 import mysql.connector
 from dotenv import load_dotenv
 from deepface import DeepFace
@@ -17,29 +17,11 @@ class SistemaAsistencia:
     def __init__(self):
         self.pantalla = Tk()
         self.camara_lista = False
-
-        self.pantalla.title("Sistema de Control de Asistencia")
-        
-        # 🔹 Tamaño de la ventana
-        ancho = 400
-        alto = 400
-        
-        # 🔹 Tamaño de la pantalla
-        pantalla_ancho = self.pantalla.winfo_screenwidth()
-        pantalla_alto = self.pantalla.winfo_screenheight()
-        
-        # 🔹 Posición centrada
-        x = (pantalla_ancho // 2) - (ancho // 2)
-        y = (pantalla_alto // 2) - (alto // 2)
-        self.pantalla.geometry(f"{ancho}x{alto}+{x}+{y}")
-        self.pantalla.resizable(False, False)
-        
         # Crear carpetas si no existen
         if not os.path.exists("rostros_registro"):
             os.makedirs("rostros_registro")
         if not os.path.exists("rostros_asistencia"):
             os.makedirs("rostros_asistencia")
-        
         # Configuración de base de datos
         self.db_config = {
             'host': os.getenv('DB_HOST'),
@@ -50,7 +32,7 @@ class SistemaAsistencia:
         }
         
         self.crear_pantalla_principal()
-        
+
     def conectar_db(self):
         """Establece conexión con la base de datos"""
         try:
@@ -60,65 +42,135 @@ class SistemaAsistencia:
             messagebox.showerror("Error de BD", f"Error al conectar a la base de datos:\n{err}")
             return None
     
-    def crear_pantalla_principal(self):
-        # Título
-        Label(self.pantalla, text="CONTROL DE ASISTENCIA", 
-              bg="gray", fg="white", width="300", height="2", 
-              font=("Verdana", 13)).pack()
-        
-        Label(self.pantalla, text="").pack(pady=10)
-        
-        # Botón Registro
-        Button(self.pantalla, text="👤 Registro de Usuario", height="2", width="35",
-               bg="#2196F3", fg="white", font=("Arial", 11, "bold"),
-               command=self.ventana_registro).pack(pady=10)
-        
-        
-        # Botón Marcar Asistencia (principal)
-        Button(self.pantalla, text="📋 MARCAR ASISTENCIA", height="2", width="35",
-               bg="#4CAF50", fg="white", font=("Arial", 11, "bold"),
-               command=self.ventana_marcar_asistencia).pack(pady=10)
-        
-        # Botón Salir
-        Button(self.pantalla, text="❌ Salir", height="2", width="35",
-               bg="#f44336", fg="white", font=("Arial", 11, "bold"),
-               command=self.pantalla.quit).pack(pady=10)
-    
-    def ventana_registro(self):
-        self.pantalla_registro = Toplevel(self.pantalla)
-        self.pantalla_registro.title("Registro de Usuario")
-        # 🔹 Tamaño de la ventana
-        ancho = 350
-        alto = 350
-        # 🔹 Tamaño de la pantalla
-        pantalla_ancho = self.pantalla_registro.winfo_screenwidth()
-        pantalla_alto = self.pantalla_registro.winfo_screenheight()
-        
-        # 🔹 Posición centrada
+    def centrar_ventana(self, ventana, ancho, alto, resizable=False):
+        ventana.update_idletasks()  # Evita centrar mal en algunos sistemas
+
+        pantalla_ancho = ventana.winfo_screenwidth()
+        pantalla_alto = ventana.winfo_screenheight()
+
         x = (pantalla_ancho // 2) - (ancho // 2)
         y = (pantalla_alto // 2) - (alto // 2)
-        self.pantalla_registro.geometry(f"{ancho}x{alto}+{x}+{y}")
-        self.pantalla_registro.resizable(False, False)
 
+        ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+        ventana.resizable(resizable, resizable)
+
+    def crear_pantalla_principal(self):
+        """Crea y configura la pantalla principal del sistema."""
+        
+        # Configuración inicial de la ventana
+        self.pantalla.title("Sistema de Control de Asistencia")
+        self.centrar_ventana(self.pantalla, 400, 400)
+
+        # =========================
+        # CANVAS (FONDO)
+        # =========================
+        canvas = Canvas(
+            self.pantalla, 
+            width=400, 
+            height=400, 
+            highlightthickness=0
+        )
+        canvas.place(x=0, y=0)
+
+        # Cargar y redimensionar imagen de fondo
+        ruta_img = os.path.join(os.path.dirname(__file__), "img", "prueb1.jpg")
+        img = Image.open(ruta_img)
+        img = img.resize((400, 400), Image.LANCZOS)
+        
+        self.bg_img = ImageTk.PhotoImage(img)
+        canvas.create_image(0, 0, image=self.bg_img, anchor="nw")
+
+        # =========================
+        # HEADER
+        # =========================
+        canvas.create_rectangle(
+            0, 0, 400, 60,
+            fill="black",
+            stipple="gray50",  # Simula transparencia
+            outline=""
+        )
+        canvas.create_text(
+            200, 30,
+            text="CONTROL DE ASISTENCIA",
+            fill="white",
+            font=("Verdana", 14, "bold")
+        )
+
+        # =========================
+        # BOTONES
+        # =========================
+        
+        # Configuración común de botones
+        config_boton = {
+            "width": 30,
+            "height": 2,
+            "font": ("Arial", 11, "bold")
+        }
+        
+        # Botón Registro
+        Button(
+            self.pantalla,
+            text="👤 Registro de Usuario",
+            bg="#2196F3",
+            fg="white",
+            command=self.ventana_registro,
+            **config_boton
+        ).place(relx=0.5, y=150, anchor="center")
+
+        # Botón Asistencia
+        Button(
+            self.pantalla,
+            text="📋 Marcar Asistencia",
+            bg="#4CAF50",
+            fg="white",
+            command=self.ventana_marcar_asistencia,
+            **config_boton
+        ).place(relx=0.5, y=230, anchor="center")
+
+        # Botón Salir
+        Button(
+            self.pantalla,
+            text="❌ Salir",
+            bg="#f44336",
+            fg="white",
+            command=self.pantalla.quit,
+            **config_boton
+        ).place(relx=0.5, y=310, anchor="center")
+    
+    def ventana_registro(self):
+        """Crea la ventana de registro de nuevo usuario."""
+        
+        # Configuración de la ventana
+        self.pantalla_registro = Toplevel(self.pantalla)
+        self.pantalla_registro.title("Registro de Usuario")
+        self.centrar_ventana(self.pantalla_registro, 350, 350)
+
+        # =========================
+        # HEADER
+        # =========================
         Label(
             self.pantalla_registro,
             text="REGISTRO DE NUEVO USUARIO",
-            bg="#2196F3",
+            bg="#3500C5",
             fg="white",
-            width="300",
-            height="2",
+            width=300,
+            height=2,
             font=("Arial", 12, "bold")
         ).pack()
 
+        # Espaciador
         Label(self.pantalla_registro, text="").pack(pady=10)
 
+        # =========================
+        # CAMPO DE USUARIO
+        # =========================
         Label(
             self.pantalla_registro,
             text="Ingrese nombre de usuario:",
             font=("Arial", 11, "bold")
         ).pack()
 
-        self.usuario_registro = StringVar()    # Variable para almacenar el nombre de usuario
+        self.usuario_registro = StringVar()
         entry_usuario = Entry(
             self.pantalla_registro,
             textvariable=self.usuario_registro,
@@ -129,8 +181,12 @@ class SistemaAsistencia:
         entry_usuario.pack(pady=10)
         entry_usuario.focus()
 
+        # Espaciador
         Label(self.pantalla_registro, text="").pack(pady=5)
 
+        # =========================
+        # BOTÓN SIGUIENTE
+        # =========================
         Button(
             self.pantalla_registro,
             text="➡️ SIGUIENTE",
@@ -142,6 +198,9 @@ class SistemaAsistencia:
             command=self.preparar_captura_registro
         ).pack(pady=10)
 
+        # =========================
+        # LABEL RESULTADO
+        # =========================
         self.label_resultado_reg = Label(
             self.pantalla_registro,
             text="",
@@ -183,32 +242,28 @@ class SistemaAsistencia:
         self.ventana_captura_registro(usuario)
 
     def ventana_captura_registro(self, usuario):
+        """Crea la ventana de preparación para captura de rostro."""
+        
+        # Configuración de la ventana
         self.pantalla_captura = Toplevel(self.pantalla)
         self.pantalla_captura.title("Captura de Rostro - Registro")
-        # 🔹 Tamaño de la ventana
-        ancho = 500
-        alto = 500
-        # 🔹 Tamaño de la pantalla
-        pantalla_ancho = self.pantalla_captura.winfo_screenwidth()
-        pantalla_alto = self.pantalla_captura.winfo_screenheight()
-        # 🔹 Posición centrada
-        x = (pantalla_ancho // 2) - (ancho // 2)
-        y = (pantalla_alto // 2) - (alto // 2)
-        self.pantalla_captura.geometry(f"{ancho}x{alto}+{x}+{y}")
-        self.pantalla_captura.resizable(False, False)
+        self.centrar_ventana(self.pantalla_captura, 400, 400)
 
-
+        # =========================
+        # HEADER
+        # =========================
         Label(
             self.pantalla_captura,
             text="PREPARACIÓN PARA CAPTURA",
-            bg="#FF9800",
+            bg="#3500C5",
             fg="white",
-            width="300",
-            height="2",
+            width=400,
+            height=2,
             font=("Arial", 12, "bold")
         ).pack()
 
-        Label(self.pantalla_captura, text="").pack(pady=10)
+        # Espaciador
+        Label(self.pantalla_captura, text="").pack(pady=5)
 
         # Instrucciones
         frame_instrucciones = Frame(
@@ -223,45 +278,50 @@ class SistemaAsistencia:
             frame_instrucciones,
             text="📸 INSTRUCCIONES IMPORTANTES:",
             font=("Arial", 11, "bold"),
-            bg="#FFF3E0",
-            fg="#E65100"
-        ).pack(pady=10)
+            bg="#FFE8C4",
+            fg="#F0A400"
+        ).pack(pady=8)
 
-        Label(frame_instrucciones, text="✓ Centra tu rostro, se realizara 3 capturas",
-            font=("Arial", 10), bg="#FFF3E0", anchor="w").pack(padx=20, pady=3)
+        # Lista de instrucciones
+        instrucciones = [
+            "✓ Centra tu rostro, se realizarán 3 capturas",
+            "✓ Asegúrate de tener buena iluminación",
+            "✓ Retira lentes o accesorios si es posible",
+            "✓ Mantén una expresión neutral"
+        ]
+        for texto in instrucciones:
+            Label(
+                frame_instrucciones,
+                text=texto,
+                font=("Arial", 10),
+                bg="#FFF3E0",
+                anchor="center"
+            ).pack(padx=20, pady=3, fill=X)
 
-        Label(frame_instrucciones, text="✓ Asegúrate de tener buena iluminación",
-            font=("Arial", 10), bg="#FFF3E0", anchor="w").pack(padx=20, pady=3)
-
-        Label(frame_instrucciones, text="✓ Retira lentes o accesorios si es posible",
-            font=("Arial", 10), bg="#FFF3E0", anchor="w").pack(padx=20, pady=3)
-
-        Label(frame_instrucciones, text="✓ Mantén una expresión neutral",
-            font=("Arial", 10), bg="#FFF3E0", anchor="w").pack(padx=20, pady=3)
-
-        Label(self.pantalla_captura, text="").pack(pady=10)
-
+        # Espaciador
+        Label(self.pantalla_captura, text="").pack(pady=2)
+        
         Button(
             self.pantalla_captura,
-            text="📷 INICIAR CAPTURA",
+            text=" INICIAR CAPTURA",
             width=30,
             height=2,
-            bg="#4CAF50",
+            bg="#27B42B",
             fg="white",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 10, "bold"),
             command=lambda: self.capturar_rostro_registro(usuario,self.pantalla_captura)
-        ).pack(pady=10)
+        ).pack(pady=5)
 
         Button(
             self.pantalla_captura,
             text="Cancelar",
             width=30,
             height=2,
-            bg="#f44336",
+            bg="#f02a1c",
             fg="white",
-            font=("Arial", 10),
+            font=("Arial", 10, "bold"),
             command=self.pantalla_captura.destroy
-        ).pack(pady=10)
+        ).pack(pady=5)
 
 
     def capturar_rostro_registro(self, usuario, pantalla_captura):
@@ -277,15 +337,15 @@ class SistemaAsistencia:
             capturas_realizadas = 0
             imagenes_guardadas = []  # Lista para guardar nombres de archivos
             
-            # ═══════════════════════════════════════════════════════════════
+            # ══════════════════════════════════════════
             # 🔄 BUCLE DE CAPTURAS (3 veces)
-            # ═══════════════════════════════════════════════════════════════
+            # ══════════════════════════════════════════
             while capturas_realizadas < total_capturas:
                 numero_captura_actual = capturas_realizadas + 1
                 
-                # ═══════════════════════════════════════════════════════════════
+                # ══════════════════════════════════════
                 # 1️⃣ CONFIGURACIÓN INICIAL DE CÁMARA
-                # ═══════════════════════════════════════════════════════════════
+                # ══════════════════════════════════════
                 cap = cv2.VideoCapture(0)
                 if not cap.isOpened():
                     messagebox.showerror("Error", "No se pudo acceder a la cámara")
@@ -352,17 +412,6 @@ class SistemaAsistencia:
                     texto_captura = f"Captura {numero_captura_actual}/{total_capturas}"
                     (text_w, text_h), _ = cv2.getTextSize(texto_captura, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
                     cv2.putText(frame_preview, texto_captura, (640 - text_w - 15, 42), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
-                    
-                    # Mensaje central
-                    #if numero_captura_actual == 1:
-                    #    mensaje = "Mira de frente - Expresion normal"
-                    #elif numero_captura_actual == 2:
-                    #    mensaje = "Ahora gira un poco la cabeza"
-                    #else:
-                    #    mensaje = "Ultima captura - Sonrie levemente"
-                    
-                    #cv2.putText(frame_preview, mensaje, 
-                    #        (110, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 0), 2)
                     
                     # Fondo inferior
                     overlay = frame_preview.copy()
@@ -583,64 +632,122 @@ class SistemaAsistencia:
             messagebox.showerror("Error", f"Error en el registro:\n{str(e)}")
    
     def ventana_marcar_asistencia(self):
+        """Crea la ventana de preparación para marcar asistencia."""
+        
+        # Configuración de la ventana
         self.pantalla_asistencia = Toplevel(self.pantalla)
         self.pantalla_asistencia.title("Marcar Asistencia")
-        # 🔹 Tamaño de la ventana
-        ancho = 500
-        alto = 500
-        # 🔹 Tamaño de la pantalla
-        pantalla_ancho = self.pantalla_asistencia.winfo_screenwidth()
-        pantalla_alto = self.pantalla_asistencia.winfo_screenheight()
-        # 🔹 Posición centrada
-        x = (pantalla_ancho // 2) - (ancho // 2)
-        y = (pantalla_alto // 2) - (alto // 2)
-        self.pantalla_asistencia.geometry(f"{ancho}x{alto}+{x}+{y}")
-        self.pantalla_asistencia.resizable(False, False)
-        
-        
-        Label(self.pantalla_asistencia, text="MARCAR ASISTENCIA",
-              bg="#4CAF50", fg="white", width="300", height="2",
-              font=("Arial", 12, "bold")).pack()
-        
-        Label(self.pantalla_asistencia, text="").pack(pady=10)
-        
-        # Instrucciones
-        frame_instrucciones = Frame(self.pantalla_asistencia, bg="#E8F5E9", 
-                                   relief=RIDGE, borderwidth=3)
-        frame_instrucciones.pack(pady=10, padx=20, fill=BOTH)
-        
-        Label(frame_instrucciones, text="📸 PREPARACIÓN PARA MARCAR ASISTENCIA:",
-              font=("Arial", 11, "bold"), bg="#E8F5E9", fg="#1B5E20").pack(pady=10)
-        
-        Label(frame_instrucciones, text="✓ CENTRA TU ROSTRO en la cámara",
-              font=("Arial", 10, "bold"), bg="#E8F5E9", fg="#2E7D32", anchor="w").pack(padx=20, pady=5)
-        
-        Label(frame_instrucciones, text="✓ AÑADE BUENA ILUMINACIÓN",
-              font=("Arial", 10, "bold"), bg="#E8F5E9", fg="#2E7D32", anchor="w").pack(padx=20, pady=5)
-        
-        Label(frame_instrucciones, text="✓ Asegúrate de estar registrado previamente",
-              font=("Arial", 10), bg="#E8F5E9", anchor="w").pack(padx=20, pady=3)
-        
-        Label(frame_instrucciones, text="✓ El sistema detectará tu rostro automáticamente",
-              font=("Arial", 10), bg="#E8F5E9", anchor="w").pack(padx=20, pady=3)
-        
-        Label(frame_instrucciones, text="").pack(pady=5)
-        
-        Label(self.pantalla_asistencia, text="").pack(pady=5)
-        
+        self.centrar_ventana(self.pantalla_asistencia, 400, 450)
+
+        # =========================
+        # HEADER
+        # =========================
         Label(
             self.pantalla_asistencia,
-            text="📝 Observación (solo si llega tarde):",font=("Arial", 10, "bold"),bg="#E8F5E9",anchor="w").pack(padx=20, pady=(5, 2), fill="x")
-        self.usuario_observacion = StringVar()    # Variable para almacenar
-        entry_usuario_obs = Entry(self.pantalla_asistencia,textvariable=self.usuario_observacion,font=("Arial", 13),width=30,justify="left")
+            text="MARCAR ASISTENCIA",
+            bg="#3500C5",
+            fg="white",
+            width=400,
+            height=2,
+            font=("Arial", 12, "bold")
+        ).pack()
+
+        # Espaciador
+        Label(self.pantalla_asistencia, text="").pack(pady=5)
+
+        # =========================
+        # FRAME DE INSTRUCCIONES
+        # =========================
+        frame_instrucciones = Frame(
+            self.pantalla_asistencia,
+            bg="#FFF3E0",
+            relief=RIDGE,
+            borderwidth=3
+        )
+        frame_instrucciones.pack(pady=10, padx=20, fill=BOTH)
+
+        # Título de instrucciones
+        Label(
+            frame_instrucciones,
+            text="PREPARACIÓN PARA MARCAR ASISTENCIA",
+            font=("Arial", 11, "bold"),
+            bg="#FFE8C4",
+            fg="#F0A400"
+        ).pack(pady=8)
+
+        # Lista de instrucciones
+        instrucciones = [
+            "✓ Centra tu rostro en la CÁMARA",
+            "✓ Asegúrate de tener buena iluminación",
+            "✓ Asegúrate de estar registrado previamente"
+        ]
+
+        for texto in instrucciones:
+            Label(
+                frame_instrucciones,
+                text=texto,
+                font=("Arial", 10),
+                bg="#FFF3E0",
+                anchor="w"
+            ).pack(padx=20, pady=3, fill=X)
+
+        # Espaciador
+        Label(self.pantalla_asistencia, text="").pack(pady=2)
+
+        # =========================
+        # CAMPO DE OBSERVACIÓN
+        # =========================
+        Label(
+            self.pantalla_asistencia,
+            text="Observación (solo si llega tarde):",
+            font=("Arial", 10, "bold"),
+            bg="#B4F8BA",
+            anchor="center"
+        ).pack(padx=20, pady=(5, 2), fill=X)
+
+        self.usuario_observacion = StringVar()
+        entry_usuario_obs = Entry(
+            self.pantalla_asistencia,
+            textvariable=self.usuario_observacion,
+            font=("Arial", 13),
+            width=30,
+            justify="left"
+        )
         entry_usuario_obs.pack(pady=6)
         entry_usuario_obs.focus()
+
+        # Espaciador
+        Label(self.pantalla_asistencia, text="").pack(pady=2)
+
+        # =========================
+        # BOTONES
+        # =========================
         
-        Label(self.pantalla_asistencia, text="").pack(pady=1)
-        
-        Button(self.pantalla_asistencia, text="📷 INICIAR CAPTURA", width=30, height=2, bg="#4CAF50", fg="white",font=("Arial", 12, "bold"),command=lambda: self.capturar_asistencia(self.pantalla_asistencia ) ).pack(pady=10)
-        
-        Button(self.pantalla_asistencia, text="Cancelar", width=30, height=2, bg="#f44336", fg="white",font=("Arial", 10), command=self.pantalla_asistencia.destroy).pack(pady=5)
+        # Botón Iniciar Captura
+        Button(
+            self.pantalla_asistencia,
+            text="📷 INICIAR CAPTURA",
+            width=30,
+            height=2,
+            bg="#27B42B",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            command=lambda: self.capturar_asistencia(self.pantalla_asistencia)
+        ).pack(pady=5)
+
+        # Botón Cancelar
+        Button(
+            self.pantalla_asistencia,
+            text="❌ Cancelar",
+            width=30,
+            height=2,
+            bg="#f02a1c",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            command=self.pantalla_asistencia.destroy
+        ).pack(pady=5)
+
+
 
     def capturar_asistencia(self, pantalla_asistencia):
         try:
@@ -1024,6 +1131,8 @@ class SistemaAsistencia:
         except Exception as e:
             messagebox.showerror("Error", f"Error al marcar asistencia:\n{str(e)}")
     
+
+
     def determinar_tipo_estado_y_minutos(self, fecha_hora_actual):
         """
         Determina tipo de asistencia, estado y minutos extra.
@@ -1039,7 +1148,7 @@ class SistemaAsistencia:
 
         # Entrada Mañana
         ENTRADA_MANANA_INICIO = 8 * 60       # 08:00 = 480 min
-        ENTRADA_MANANA_FIN = 8 * 60 + 30     # 08:30 = 510 min
+        ENTRADA_MANANA_FIN = 8 * 60 + 20     # 08:20 = 510 min
         
         # Entrada Tarde
         ENTRADA_TARDE_INICIO = 14 * 60       # 14:00 = 840 min
@@ -1056,17 +1165,16 @@ class SistemaAsistencia:
         # ═══════════════════════════════════════════════════════════════
         # 🌅 BLOQUE 1: ENTRADA MAÑANA
         # ═══════════════════════════════════════════════════════════════
-        
         # Caso 1: ANTES de 08:00 (Entrada temprana con tiempo extra)
         if minutos_actuales < ENTRADA_MANANA_INICIO:
             minutos_extra = ENTRADA_MANANA_INICIO - minutos_actuales  # Positivo
             return 1, 1, minutos_extra
         
-        # Caso 2: 08:00 - 08:30 (Entrada normal)
+        # Caso 2: 08:00 - 08:20 (Entrada normal)
         if ENTRADA_MANANA_INICIO <= minutos_actuales <= ENTRADA_MANANA_FIN:
             return 1, 1, 0
         
-        # Caso 3: 08:30 - 12:55 (Entrada tarde sin extra)
+        # Caso 3: 08:20 - 12:55 (Entrada tarde sin extra)
         if ENTRADA_MANANA_FIN < minutos_actuales < SALIDA_MEDIODIA_INICIO:
             return 1, 2, 0
 
@@ -1107,7 +1215,6 @@ class SistemaAsistencia:
         # Esto cubre horarios extraños como 02:00 AM, 23:00 PM, etc.
         return 0, 0, 0  # 0 = INDETERMINADO
 
-    
     def comparar_rostros(self, img1_path, img2_path):
         """
         Compara dos rostros y retorna la DISTANCIA (menor = más similar)
