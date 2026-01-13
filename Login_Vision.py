@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import messagebox
 import os
 import cv2
+import sys
 from matplotlib import pyplot as plt
 from mtcnn.mtcnn import MTCNN
 import numpy as np
@@ -10,6 +11,7 @@ from PIL import Image, ImageTk
 import mysql.connector
 from dotenv import load_dotenv
 from deepface import DeepFace
+import hashlib  # Para encriptar contraseñas
 # Cargar variables de entorno
 load_dotenv()
 
@@ -17,11 +19,32 @@ class SistemaAsistencia:
     def __init__(self):
         self.pantalla = Tk()
         self.camara_lista = False
-        # Crear carpetas si no existen
-        if not os.path.exists("rostros_registro"):
-            os.makedirs("rostros_registro")
-        if not os.path.exists("rostros_asistencia"):
-            os.makedirs("rostros_asistencia")
+        # 📌 Ruta base (donde está el exe)
+        if getattr(sys, 'frozen', False):
+            BASE_DIR = os.path.dirname(sys.executable)
+        else:
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            
+        # 📁 Directorio principal
+        self.APP_DIR = BASE_DIR  # C:\Reconocimiento_facial
+        
+        # 📂 Subcarpetas
+        self.IMG_DIR = os.path.join(self.APP_DIR, "img")
+        self.REGISTRO_DIR = os.path.join(self.APP_DIR, "rostros_registro")
+        self.ASISTENCIA_DIR = os.path.join(self.APP_DIR, "rostros_asistencia")
+        self.LOG_DIR = os.path.join(self.APP_DIR, "logs")
+        
+        # Crear carpetas
+        os.makedirs(self.REGISTRO_DIR, exist_ok=True)
+        os.makedirs(self.ASISTENCIA_DIR, exist_ok=True)
+        os.makedirs(self.LOG_DIR, exist_ok=True)
+        os.makedirs(self.IMG_DIR, exist_ok=True)
+        # 🔐 Cargar .env
+        env_path = os.path.join(self.APP_DIR, ".env")
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+        else:
+            print("⚠️ Archivo .env no encontrado")
         # Configuración de base de datos
         self.db_config = {
             'host': os.getenv('DB_HOST'),
@@ -54,6 +77,192 @@ class SistemaAsistencia:
         ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
         ventana.resizable(resizable, resizable)
 
+    def encriptar_password(self, password):
+        """
+        Encripta una contraseña usando SHA256
+        
+        Args:
+            password (str): Contraseña en texto plano
+            
+        Returns:
+            str: Hash SHA256 de 64 caracteres hexadecimales
+        """
+        return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    
+    def login_administrador(self):
+        """
+        Ventana de login para validar administrador ANTES del registro
+        """
+        # ───────────────────────────────────────────────────────────
+        # 🎨 CREAR VENTANA
+        # ───────────────────────────────────────────────────────────
+        ventana_login = Toplevel(self.pantalla)
+        ventana_login.title("🔒 Acceso de Administrador")
+        
+        
+      
+        ventana_login.configure(bg="#eceff1")
+        self.centrar_ventana(ventana_login, 420, 420)
+        
+        # Modal (bloquear ventana principal)
+        ventana_login.transient(self.pantalla)
+        ventana_login.grab_set()
+        
+        # ───────────────────────────────────────────────────────────
+        # 🎨 HEADER
+        # ───────────────────────────────────────────────────ñ────────
+        header = Frame(ventana_login, bg="#37474f", height=90)
+        header.pack(fill='x')
+        header.pack_propagate(False)
+        
+        Label(header, text="🔐", bg="#37474f", 
+            font=("Segoe UI Emoji", 20)).pack(pady=(5, 0))
+        
+        Label(header, text="ACCESO DE ADMINISTRADOR", 
+            bg="#37474f", fg="white", 
+            font=("Arial", 13, "bold")).pack()
+        
+        # ───────────────────────────────────────────────────────────
+        # 📝 FORMULARIO
+        # ───────────────────────────────────────────────────────────
+        form_frame = Frame(ventana_login, bg="#eceff1")
+        form_frame.pack(pady=30, padx=40, fill='both', expand=True)
+        
+        # Campo Usuario
+        Label(form_frame, text="👤 Usuario Administrador:", 
+            bg="#eceff1", fg="#37474f", 
+            font=("Arial", 10, "bold")).pack(anchor='w', pady=(10, 5))
+        
+        entry_usuario = Entry(form_frame, font=("Arial", 11), bd=2, 
+                            relief='solid', bg="white")
+        entry_usuario.pack(fill='x', ipady=10)
+        entry_usuario.focus()
+        
+        # Campo Contraseña
+        Label(form_frame, text="🔑 Contraseña:", 
+            bg="#eceff1", fg="#37474f", 
+            font=("Arial", 10, "bold")).pack(anchor='w', pady=(20, 5))
+        
+        entry_password = Entry(form_frame, font=("Arial", 11), bd=2, 
+                            relief='solid', show="●", bg="white")
+        entry_password.pack(fill='x', ipady=10)
+        
+        # Mensaje de error (oculto inicialmente)
+        label_error = Label(form_frame, text="", bg="#eceff1", 
+                        fg="#f44336", font=("Arial", 9, "bold"))
+        label_error.pack(pady=(15, 0))
+        
+        # ───────────────────────────────────────────────────────────
+        #  VALIDACIÓN CON HASH
+        # ───────────────────────────────────────────────────────────
+        def validar_login():
+            usuario = entry_usuario.get().strip()
+            password = entry_password.get().strip()
+            
+            # Validar campos vacíos
+            if not usuario or not password:
+                label_error.config(text="⚠️ Complete todos los campos")
+                return
+            
+            # ENCRIPTAR CONTRASEÑA INGRESADA
+            #password_hash = self.encriptar_password(password)
+            
+            # Validar contra base de datos
+            conexion = self.conectar_db()
+            if conexion:
+                try:
+                    cursor = conexion.cursor()
+                    
+                    # 🔥 QUERY: Comparar con hash almacenado
+                    query = """
+                        SELECT id, nombre, rol 
+                        FROM administradores 
+                        WHERE usuario = %s AND password = %s AND activo = 1
+                    """
+                    cursor.execute(query, (usuario,password))
+                    resultado = cursor.fetchone()
+                    
+                    if resultado:
+                        # ✅ LOGIN EXITOSO
+                        admin_id, admin_nombre, admin_rol = resultado
+                        
+                        # Registrar último acceso
+                        cursor.execute(
+                            "UPDATE administradores SET ultimo_acceso = NOW() WHERE id = %s",
+                            (admin_id,)
+                        )
+                        conexion.commit()
+                        
+                        cursor.close()
+                        conexion.close()
+                        
+                        ventana_login.destroy()
+                        
+                        messagebox.showinfo(
+                            "✅ Acceso Concedido",
+                            f"Bienvenido(a) {admin_nombre}\n"
+                            f"Rol: {admin_rol}\n\n"
+                            f"Ahora puede registrar usuarios"
+                        )
+                        
+                        # Abrir ventana de registro
+                        self.ventana_registro()
+                        
+                    else:
+                        # ❌ CREDENCIALES INCORRECTAS
+                        label_error.config(text="❌ Usuario o contraseña incorrectos")
+                        entry_password.delete(0, END)
+                        entry_password.focus()
+                        
+                except Exception as e:
+                    messagebox.showerror("Error BD", f"Error al validar:\n{str(e)}")
+                    if conexion and conexion.is_connected():
+                        conexion.close()
+            else:
+                messagebox.showerror("Error", "No se pudo conectar a la base de datos")
+        
+        # ───────────────────────────────────────────────────────────
+        # 🔘 BOTONES
+        # ───────────────────────────────────────────────────────────
+        buttons_frame = Frame(form_frame, bg="#eceff1")
+        buttons_frame.pack(pady=(25, 0))
+        
+        # Botón Ingresar
+        Button(
+            buttons_frame,
+            text="🔓  Ingresar",
+            bg="#4CAF50",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=12,
+            bd=0,
+            cursor="hand2",
+            padx=15,
+            pady=10,
+            command=validar_login
+        ).pack(side='left', padx=8)
+        
+        # Botón Cancelar
+        Button(
+            buttons_frame,
+            text="❌  Cancelar",
+            bg="#f44336",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=12,
+            bd=0,
+            cursor="hand2",
+            padx=15,
+            pady=10,
+            command=ventana_login.destroy
+        ).pack(side='left', padx=8)
+        
+        # ───────────────────────────────────────────────────────────
+        # ⌨️ ATAJOS DE TECLADO
+        # ───────────────────────────────────────────────────────────
+        entry_password.bind("<Return>", lambda e: validar_login())
+        ventana_login.bind("<Escape>", lambda e: ventana_login.destroy())
+        
     def crear_pantalla_principal(self):
         """Crea y configura la pantalla principal del sistema."""
         
@@ -73,7 +282,7 @@ class SistemaAsistencia:
         canvas.place(x=0, y=0)
 
         # Cargar y redimensionar imagen de fondo
-        ruta_img = os.path.join(os.path.dirname(__file__), "img", "prueb1.jpg")
+        ruta_img = os.path.join(self.IMG_DIR, "prueb1.jpg")
         img = Image.open(ruta_img)
         img = img.resize((400, 400), Image.LANCZOS)
         
@@ -113,7 +322,7 @@ class SistemaAsistencia:
             text="👤 Registro de Usuario",
             bg="#2196F3",
             fg="white",
-            command=self.ventana_registro,
+            command=self.login_administrador,  # Login primero
             **config_boton
         ).place(relx=0.5, y=150, anchor="center")
 
@@ -322,7 +531,6 @@ class SistemaAsistencia:
             font=("Arial", 10, "bold"),
             command=self.pantalla_captura.destroy
         ).pack(pady=5)
-
 
     def capturar_rostro_registro(self, usuario, pantalla_captura):
         """
@@ -747,8 +955,6 @@ class SistemaAsistencia:
             command=self.pantalla_asistencia.destroy
         ).pack(pady=5)
 
-
-
     def capturar_asistencia(self, pantalla_asistencia):
         try:
             # ═══════════════════════════════════════════════════════════════
@@ -1131,8 +1337,6 @@ class SistemaAsistencia:
         except Exception as e:
             messagebox.showerror("Error", f"Error al marcar asistencia:\n{str(e)}")
     
-
-
     def determinar_tipo_estado_y_minutos(self, fecha_hora_actual):
         """
         Determina tipo de asistencia, estado y minutos extra.
@@ -1268,7 +1472,6 @@ class SistemaAsistencia:
             
             return distancia_orb
 
-
     def comparar_rostros_orb(self, img1_path, img2_path):
         """
         Fallback con ORB cuando DeepFace falla
@@ -1367,3 +1570,25 @@ class SistemaAsistencia:
 if __name__ == "__main__":
     sistema = SistemaAsistencia()
     sistema.iniciar()
+    
+    
+    
+    
+#pip install pyinstaller
+#pyinstaller --onefile --icon=icono.ico GEmanuel.py
+
+#pyinstaller --onefile --windowed --name="Sistema_Asistencia" --icon="icono.ico" Login_Vision.py
+
+'''
+1. Crear carpeta:
+   📁 C:\Sistema_Asistencia\
+
+2. Copiar estos archivos:
+   - dist\Sistema_Asistencia.exe
+   - .env
+   - carpeta img\
+   - carpeta logs\ (vacía)
+   - carpeta rostros_asistencia\ (vacía)
+   - carpeta rostros_registro\ (vacía)
+'''
+

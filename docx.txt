@@ -1,0 +1,17 @@
+pip install numpy pillow python-dotenv
+
+pip install opencv-python
+
+pip install opencv-contrib-python
+
+pip install matplotlib
+
+pip install mtcnn
+
+pip install mysql-connector-python
+
+pip install deepface
+
+pip install tf-keras
+
+pip install pyinstaller
