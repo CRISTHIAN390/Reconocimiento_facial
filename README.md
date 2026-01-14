@@ -1,11 +1,9 @@
-# 👤 Sistema de Reconocimiento Facial – Control de Asistencia
-
-Sistema de **reconocimiento facial** desarrollado en **Python** que permite el **registro de usuarios** y la **toma de asistencia** mediante comparación facial, utilizando una base de datos **MySQL** para el almacenamiento de la información.
-
----
+# 👤 Sistema de Reconocimiento Facial – Control de Asistencia de Personal
+Sistema de **reconocimiento facial** desarrollado en **Python** que permite al administrador gestionar el registro de trabajadores y realizar la toma de asistencia mediante comparación facial.
+El sistema utiliza hasta 3 registros faciales por trabajador para mejorar la precisión y almacena la información en una base de datos **MySQL**.
+--
 
 ## 🛠️ Tecnologías Utilizadas
-
 - **Python 3.10**
 - **DeepFace** (reconocimiento facial)
 - **TensorFlow** (backend de DeepFace)
@@ -14,12 +12,9 @@ Sistema de **reconocimiento facial** desarrollado en **Python** que permite el *
 - **MySQL** (almacenamiento de datos)
 - **python-dotenv** (gestión de variables de entorno)
 - **Tkinter** (interfaz gráfica)
-
-
 ---
 
 ## 📋 Requisitos
-
 - Python **3.10 **
 - MySQL Server
 - Cámara web funcional
@@ -31,16 +26,22 @@ Sistema de **reconocimiento facial** desarrollado en **Python** que permite el *
 ## 📦 Instalación
 
 ```bash
-Clona el proyecto y accede
+1️⃣ Clonar el proyecto
 - git clone https://github.com/CRISTHIAN390/-Reconocimiento_facial.git
 - cd ReconocimientoFacial
 
-Crear entorno
-python -m venv venv
 
-Activa entorno
+2️⃣ Crear y activar el entorno virtual
+- python -m venv venv
 - venv\Scripts\activate
-
 - pip install -r requirements.txt
-Ejecuta
+
+3️⃣ Ejecutar la aplicación
 - python Login_Vision.py
+
+🧩 Generar el ejecutable
+-Configura la conexión a la base de datos (local o cloud) y crea el usuario administrador con la contraseña encriptada.
+-Define la ruta donde estarán los archivos del sistema.      PROJECT_DIR=""
+-Instala PyInstaller: pip install pyinstaller
+-Genera el ejecutable: pyinstaller --onefile --windowed --name="Sistema_Asistencia" --icon="icono.ico" launcher.py
+-Entra a la carpeta dist, ejecuta Sistema_Asistencia.exe y listo.

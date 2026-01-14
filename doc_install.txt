@@ -1,3 +1,5 @@
+#ORDEN DE INSTALACION MANUAL
+
 pip install numpy pillow python-dotenv
 
 pip install opencv-python

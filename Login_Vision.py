@@ -1578,17 +1578,3 @@ if __name__ == "__main__":
 #pyinstaller --onefile --icon=icono.ico GEmanuel.py
 
 #pyinstaller --onefile --windowed --name="Sistema_Asistencia" --icon="icono.ico" Login_Vision.py
-
-'''
-1. Crear carpeta:
-   📁 C:\Sistema_Asistencia\
-
-2. Copiar estos archivos:
-   - dist\Sistema_Asistencia.exe
-   - .env
-   - carpeta img\
-   - carpeta logs\ (vacía)
-   - carpeta rostros_asistencia\ (vacía)
-   - carpeta rostros_registro\ (vacía)
-'''
-
